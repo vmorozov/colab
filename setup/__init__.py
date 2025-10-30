@@ -7,6 +7,8 @@ from .project import (
     execute_notebook,
     install_project_requirements,
     store_credentials_from_env,
+    setup_google_drive_project,
+    setup_vscode_tunnel,
 )
 
 __all__ = [
@@ -16,4 +18,6 @@ __all__ = [
     "execute_notebook",
     "install_project_requirements",
     "store_credentials_from_env",
+    "setup_google_drive_project",
+    "setup_vscode_tunnel",
 ]

@@ -71,6 +71,57 @@ def change_directory(path: Path) -> Path:
     return resolved
 
 
+def setup_google_drive_project(
+    project_name: Optional[str] = None,
+    *,
+    mount_point: str = "/content/gdrive",
+    projects_root: str = "/content/gdrive/MyDrive/projects",
+    symlink_path: str = "/project",
+) -> Path:
+    """Mount Google Drive and ensure a project directory exists for the given project."""
+
+    try:
+        drive = importlib.import_module("google.colab.drive")
+    except ImportError as exc:  # pragma: no cover - accessible only within Colab
+        raise RuntimeError("google.colab.drive is unavailable; this helper only works in Google Colab.") from exc
+
+    project_name = project_name or ensure_project_name()
+    drive.mount(mount_point, force_remount=False)
+
+    projects_root_path = Path(projects_root)
+    projects_root_path.mkdir(parents=True, exist_ok=True)
+
+    symlink_target = projects_root_path
+    symlink = Path(symlink_path)
+    if symlink.exists():
+        if not symlink.is_symlink() or symlink.resolve() != symlink_target:
+            raise RuntimeError(
+                f"Symlink location {symlink} exists and does not point to {symlink_target}; adjust the notebook configuration."
+            )
+    else:
+        symlink.symlink_to(symlink_target)
+
+    project_dir = symlink / project_name
+    project_dir.mkdir(parents=True, exist_ok=True)
+    os.environ["PROJECT_DIR"] = str(project_dir)
+    return project_dir
+
+
+def setup_vscode_tunnel(project_name: Optional[str] = None) -> object:
+    """Install vscode-colab if needed, log in, and connect to a VS Code tunnel."""
+
+    project_name = project_name or ensure_project_name()
+
+    try:
+        vscode_colab = importlib.import_module("vscode_colab")
+    except ImportError:
+        subprocess.run([sys.executable, "-m", "pip", "install", "vscode-colab"], check=True)
+        vscode_colab = importlib.import_module("vscode_colab")
+
+    vscode_colab.login()
+    return vscode_colab.connect(name=project_name, create_new_project=project_name)
+
+
 def _torch_versions() -> tuple[str, Optional[str]]:
     try:
         torch = importlib.import_module("torch")

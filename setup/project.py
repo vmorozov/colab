@@ -100,11 +100,10 @@ def setup_google_drive_project(
             )
     else:
         symlink.symlink_to(symlink_target)
-
-    project_dir = symlink / project_name
-    project_dir.mkdir(parents=True, exist_ok=True)
-    os.environ["PROJECT_DIR"] = str(project_dir)
-    return project_dir
+    print(f"Google Drive project directory linked to: {symlink_target!s}")
+    out_dir = symlink / project_name
+    #out_dir.mkdir(parents=True, exist_ok=True)
+    return out_dir
 
 
 def setup_vscode_tunnel(project_name: Optional[str] = None) -> object:

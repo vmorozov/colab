@@ -106,10 +106,8 @@ def setup_google_drive_project(
     return out_dir
 
 
-def setup_vscode_tunnel(project_name: Optional[str] = None) -> object:
-    """Install vscode-colab if needed, log in, and connect to a VS Code tunnel."""
-
-    project_name = project_name or ensure_project_name()
+def setup_vscode_tunnel() -> object:
+    """Install vscode-colab if needed, log in,"""
 
     try:
         vscode_colab = importlib.import_module("vscode_colab")
@@ -118,7 +116,7 @@ def setup_vscode_tunnel(project_name: Optional[str] = None) -> object:
         vscode_colab = importlib.import_module("vscode_colab")
 
     vscode_colab.login()
-    return vscode_colab.connect(name=project_name, create_new_project=project_name)
+    return vscode_colab
 
 
 def _torch_versions() -> tuple[str, Optional[str]]:

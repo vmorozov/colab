@@ -173,3 +173,76 @@ def execute_notebook(
     ]
     subprocess.run(command, check=True)
     return output_path.resolve()
+
+
+def run_notebook_in_background(
+    input_notebook: Path | str='eval.ipynb',
+    output_notebook: Path | str | None = None,
+    log_file_path: Path | str | None = None,
+    convert_to_script: bool = True,
+    bash_script: str | None = None,
+    python_executable: str = sys.executable,
+) -> subprocess.Popen | None:
+    """Convert a notebook to a script and run it in the background, logging output.
+
+    When no log file is provided the script's path is suffixed with ".out" and used.
+    """
+    #raise error when convert_to_script is False and output_notebook is not provided
+    if not convert_to_script and output_notebook is None:
+        raise ValueError("output_notebook must be provided when convert_to_script is False.")
+    notebook = Path(input_notebook).resolve()
+    if notebook.suffix.lower() != ".ipynb":
+        raise ValueError(f"Notebook path must end with .ipynb: {notebook!s}")
+    if log_file_path is None:
+        log_path = Path(str(input_notebook) + ".out")
+    else:
+        log_path = Path(log_file_path)
+    log_path = log_path.expanduser().resolve()
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    if bash_script is not None:
+        print(f"Making bash script to run notebook {notebook.name!s}, logging to {log_path!s}")
+        with open(bash_script, "w") as f:
+            f.write("#!/bin/bash\n")
+    if convert_to_script:
+        script = notebook.with_suffix(".py")
+        cmd1=["jupyter", "nbconvert", "--to", "script", str(notebook)]
+        if bash_script is not None:
+            #append to bash file
+            with open(bash_script,"a") as f:
+                 f.write(f"{' '.join(cmd1)} > {log_path} 2>&1\n")
+        else:
+            subprocess.run(cmd1, check=True)
+            if not script.exists():
+                raise FileNotFoundError(f"Converted script not found at {script!s}")
+
+        cmd = [python_executable, str(script)]
+    else:
+        cmd=[
+        "jupyter",
+        "nbconvert",
+        "--to",
+        "notebook",
+        "--execute",
+        str(notebook),
+        "--output",
+        str(output_notebook)
+    ]
+        
+    if bash_script is None:
+        print(f"Starting background process for notebook {notebook.name!s}, logging to {log_path!s}")
+        with log_path.open("ab") as log_file:
+            process = subprocess.Popen(
+                cmd,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+
+        return process
+    else:
+        #return content of bash script
+        with open(bash_script,"a") as f:
+            f.write(f"{' '.join(cmd)} > {log_path} 2>&1 &\n")
+        print(f"Bash script {bash_script} created to run notebook {notebook.name!s}, logging to {log_path!s}")
+        return None

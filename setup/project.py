@@ -7,6 +7,8 @@ import os
 import stat
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Optional
 
@@ -134,6 +136,99 @@ def _build_pyg_index() -> str:
     torch_version, cuda_version = _torch_versions()
     cuda_suffix = f"cu{cuda_version.replace('.', '')}" if cuda_version else "cpu"
     return f"https://data.pyg.org/whl/torch-{torch_version}+{cuda_suffix}.html"
+
+
+def install_pyg(downgrade_torch: bool = True) -> None:
+    """Install PyG and dependencies, downgrading PyTorch if necessary."""
+    torch_version, cuda_version = _torch_versions()
+
+    if cuda_version:
+        cuda_suffix = f"cu{cuda_version.replace('.', '')}"
+    else:
+        cuda_suffix = "cpu"
+
+    base_url = "https://data.pyg.org/whl"
+
+    def check_url(url: str) -> bool:
+        try:
+            with urllib.request.urlopen(url) as response:
+                return response.status == 200
+        except urllib.error.URLError:
+            return False
+
+    # Check current version
+    current_index_url = f"{base_url}/torch-{torch_version}+{cuda_suffix}.html"
+    index_url = None
+
+    if check_url(current_index_url):
+        index_url = current_index_url
+    elif downgrade_torch:
+        # Fallback versions to check
+        candidates = [
+            "2.8.1",
+            "2.8.0",
+            "2.7.2",
+            "2.7.1",
+            "2.7.0",
+            "2.6.3",
+            "2.6.2",
+            "2.6.1",
+            "2.6.0",
+            "2.5.1",
+            "2.5.0",
+            "2.4.1",
+            "2.4.0",
+            "2.3.1",
+            "2.3.0",
+            "2.2.2",
+            "2.2.1",
+            "2.2.0",
+            "2.1.2",
+            "2.1.1",
+            "2.1.0",
+            "2.0.1",
+            "2.0.0",
+        ]
+        found_version = None
+        for ver in candidates:
+            if ver == torch_version:
+                continue
+            url = f"{base_url}/torch-{ver}+{cuda_suffix}.html"
+            if check_url(url):
+                found_version = ver
+                index_url = url
+                break
+
+        if found_version:
+            print(f"Downgrading PyTorch to {found_version} to match PyG wheels...")
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", f"torch=={found_version}"],
+                check=True,
+            )
+        else:
+            raise RuntimeError(
+                f"Could not find compatible PyG wheels for CUDA {cuda_suffix} and recent PyTorch versions."
+            )
+    else:
+        raise RuntimeError(
+            f"PyG wheels not found for torch-{torch_version}+{cuda_suffix} and downgrade_torch is False."
+        )
+
+    if index_url is None:
+        raise RuntimeError("Could not determine PyG index URL.")
+
+    # Install packages
+    print(f"Installing PyG packages using index: {index_url}")
+    pkgs = [
+        "torch_geometric",
+        "pyg_lib",
+        "torch_scatter",
+        "torch_sparse",
+        "torch_cluster",
+        "torch_spline_conv",
+    ]
+    cmd = [sys.executable, "-m", "pip", "install"] + pkgs + ["-f", index_url]
+    subprocess.run(cmd, check=True)
 
 
 def install_project_requirements(requirements_file: Path | str = "requrment.txt") -> str:

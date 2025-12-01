@@ -138,7 +138,7 @@ def _build_pyg_index() -> str:
     return f"https://data.pyg.org/whl/torch-{torch_version}+{cuda_suffix}.html"
 
 
-def install_pyg(downgrade_torch: bool = True) -> None:
+def install_pyg(downgrade_torch: bool = True,dry_run=False) -> None:
     """Install PyG and dependencies, downgrading PyTorch if necessary."""
     torch_version, cuda_version = _torch_versions()
 
@@ -146,7 +146,7 @@ def install_pyg(downgrade_torch: bool = True) -> None:
         cuda_suffix = f"cu{cuda_version.replace('.', '')}"
     else:
         cuda_suffix = "cpu"
-
+    #https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html
     base_url = "https://data.pyg.org/whl"
 
     def check_url(url: str) -> bool:
@@ -201,10 +201,14 @@ def install_pyg(downgrade_torch: bool = True) -> None:
 
         if found_version:
             print(f"Downgrading PyTorch to {found_version} to match PyG wheels...")
-            subprocess.run(
-                [sys.executable, "-m", "pip", "install", f"torch=={found_version}"],
-                check=True,
-            )
+            cmd=[sys.executable, "-m", "pip", "install", f"torch=={found_version}"]
+            if not dry_run:
+                subprocess.run(
+                    cmd,
+                    check=True,
+                )
+            else:
+                print(f"[Dry Run] Would run: {' '.join(cmd)}")
         else:
             raise RuntimeError(
                 f"Could not find compatible PyG wheels for CUDA {cuda_suffix} and recent PyTorch versions."
@@ -228,7 +232,10 @@ def install_pyg(downgrade_torch: bool = True) -> None:
         "torch_spline_conv",
     ]
     cmd = [sys.executable, "-m", "pip", "install"] + pkgs + ["-f", index_url]
-    subprocess.run(cmd, check=True)
+    if not dry_run:
+        subprocess.run(cmd, check=True)
+    else:
+        print(f"[Dry Run] Would run: {' '.join(cmd)}")
 
 
 def install_project_requirements(requirements_file: Path | str = "requrment.txt") -> str:

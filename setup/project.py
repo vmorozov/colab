@@ -137,10 +137,10 @@ def _build_pyg_index() -> str:
     cuda_suffix = f"cu{cuda_version.replace('.', '')}" if cuda_version else "cpu"
     return f"https://data.pyg.org/whl/torch-{torch_version}+{cuda_suffix}.html"
 
-
 def install_pyg(downgrade_torch: bool = True,dry_run=False) -> None:
     """Install PyG and dependencies, downgrading PyTorch if necessary."""
     torch_version, cuda_version = _torch_versions()
+    print(f"Detected PyTorch version: {torch_version}, CUDA version: {cuda_version or 'CPU only'}")
 
     if cuda_version:
         cuda_suffix = f"cu{cuda_version.replace('.', '')}"

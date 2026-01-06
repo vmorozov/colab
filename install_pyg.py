@@ -1,3 +1,12 @@
+import importlib
+import os
+import stat
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Optional
 
 def _torch_versions() -> tuple[str, Optional[str]]:
     try:
@@ -84,7 +93,7 @@ def install_pyg(downgrade_torch: bool = True,dry_run=False,dependencies: str = "
         "torch_geometric"
     ]
     if dependencies:
-        pkgs.append(dependencies.split(" "))
+        pkgs.extend(dependencies.split())
     cmd = [sys.executable, "-m", "pip", "install"] + pkgs + ["-f", index_url]
     if not dry_run:
         subprocess.run(cmd, check=True)
@@ -92,7 +101,7 @@ def install_pyg(downgrade_torch: bool = True,dry_run=False,dependencies: str = "
         print(f"[Dry Run] Would run: {' '.join(cmd)}")
 
 
-def install_project_requirements(requirements_file: Path | str = "requrment.txt") -> str:
+def install_project_requirements(requirements_file: Path | str = "requirements.txt") -> str:
     """Install project requirements, returning the PyG index URL that was used."""
 
     requirements_path = Path(requirements_file)

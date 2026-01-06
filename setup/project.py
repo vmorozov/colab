@@ -12,6 +12,38 @@ import urllib.request
 from pathlib import Path
 from typing import Optional
 
+import os
+
+
+
+def tunnel_cloudflare():
+    print("--- Starting SSH and Cloudflare Tunnel Setup ---")
+    # --- CONFIGURATION ---
+    # 1. import from env
+    USER_PUBLIC_KEY = _require_env("USER_PUBLIC_KEY")
+    CF_TUNNEL_TOKEN = _require_env("CF_TUNNEL_TOKEN")
+    CF_DOMAIN = _require_env("CF_DOMAIN")
+    # 1. Install Dependencies
+    !apt-get update -qq && apt-get install -y openssh-server -qq > /dev/null
+    !curl -L --progress-bar https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
+    !chmod +x /usr/local/bin/cloudflared
+    
+    # 2. Configure SSH with Public Key
+    !mkdir -p /root/.ssh
+    with open("/root/.ssh/authorized_keys", "w") as f:
+        f.write(USER_PUBLIC_KEY)
+    !chmod 700 /root/.ssh
+    !chmod 600 /root/.ssh/authorized_keys
+    !service ssh start
+    print("[✓] SSH Server started with Public Key authentication.")
+
+    # 3. Launch Cloudflare Tunnel
+    # We run this in the background using '&'
+    get_ipython().system_raw(f'/usr/local/bin/cloudflared tunnel --no-autoupdate run --token {CF_TUNNEL_TOKEN} > /content/tunnel.log 2>&1 &')
+    
+    print(f"[✓] Tunnel active. Point {CF_DOMAIN} to this tunnel in Cloudflare Dashboard.")
+    print(f"--- You can now connect via: ssh root@{CF_DOMAIN} ---")
+
 
 def _require_env(var_name: str) -> str:
     value = os.environ.get(var_name, "").strip()

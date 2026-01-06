@@ -11,9 +11,58 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Optional
-
+import io
 import os
+import sys
+from dotenv import load_dotenv
 
+def load_env2():
+    loaded_keys = []
+
+    # 1. Try to load from the physical .env file first
+    if load_dotenv():
+        print("✅ Loaded variables from .env file.")
+        # Parse the file to get the names for printing
+        with open(".env", "r") as f:
+            for line in f:
+                line = line.strip()
+                if "=" in line and not line.startswith("#"):
+                    loaded_keys.append(line.split("=")[0].strip())
+    
+    else:
+        # 2. If no file, ask for manual input
+        print("⚠️ No .env file found.")
+        raw_data = input("Paste your .env content here: ").strip()
+        
+        if raw_data:
+            # Applying your logic: Convert spaces back to newlines
+            # This handles the case where the paste collapses lines into one string
+            formatted_data = raw_data.replace(" ", "\n")
+            
+            # Use io.StringIO to let load_dotenv parse the string
+            load_dotenv(stream=io.StringIO(formatted_data))
+            
+            # Extract keys from the formatted string for the final report
+            for line in formatted_data.splitlines():
+                if "=" in line:
+                    key = line.split("=", 1)[0].strip()
+                    loaded_keys.append(key)
+            
+            print("✅ Loaded variables from manual input.")
+        else:
+            print("❌ No content provided. Nothing loaded.")
+            return
+
+    # 3. Print names of all variables loaded (using set to remove duplicates)
+    if loaded_keys:
+        print("\n[ Environment Variables Loaded ]")
+        for key in sorted(set(loaded_keys)):
+            # We show the key and a masked version of the value for confirmation
+            val = os.getenv(key, "")
+            masked_val = val[:3] + "..." if len(val) > 3 else "***"
+            print(f"🔑 {key} = {masked_val}")
+    else:
+        print("No valid environment variables were detected.")
 
 
 def tunnel_cloudflare():
@@ -24,29 +73,31 @@ def tunnel_cloudflare():
     CF_TUNNEL_TOKEN = _require_env("CF_TUNNEL_TOKEN")
     CF_DOMAIN = _require_env("CF_DOMAIN")
     # 1. Install Dependencies
-    !apt-get update -qq && apt-get install -y openssh-server -qq > /dev/null
-    !curl -L --progress-bar https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
-    !chmod +x /usr/local/bin/cloudflared
+    subprocess.run(["apt-get", "update", "-qq"], check=True)
+    subprocess.run(["apt-get", "install", "-y", "openssh-server", "-qq"], check=True)
+    subprocess.run(["curl", "-L", "--progress-bar", "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64", "-o", "/usr/local/bin/cloudflared"], check=True)
+    subprocess.run(["chmod", "+x", "/usr/local/bin/cloudflared"], check=True)
     
     # 2. Configure SSH with Public Key
-    !mkdir -p /root/.ssh
+    subprocess.run(["mkdir", "-p", "/root/.ssh"], check=True)
     with open("/root/.ssh/authorized_keys", "w") as f:
         f.write(USER_PUBLIC_KEY)
-    !chmod 700 /root/.ssh
-    !chmod 600 /root/.ssh/authorized_keys
-    !service ssh start
+    subprocess.run(["chmod", "700", "/root/.ssh"], check=True)
+    subprocess.run(["chmod", "600", "/root/.ssh/authorized_keys"], check=True)
+    subprocess.run(["service", "ssh", "start"], check=True)
     print("[✓] SSH Server started with Public Key authentication.")
 
     # 3. Launch Cloudflare Tunnel
     # We run this in the background using '&'
-    get_ipython().system_raw(f'/usr/local/bin/cloudflared tunnel --no-autoupdate run --token {CF_TUNNEL_TOKEN} > /content/tunnel.log 2>&1 &')
+    subprocess.run(["/usr/local/bin/cloudflared", "tunnel", "--no-autoupdate", "run", "--token", CF_TUNNEL_TOKEN, ">", "/content/tunnel.log", "2>&1", "&"], check=True)
     
     print(f"[✓] Tunnel active. Point {CF_DOMAIN} to this tunnel in Cloudflare Dashboard.")
     print(f"--- You can now connect via: ssh root@{CF_DOMAIN} ---")
 
-
 def _require_env(var_name: str) -> str:
-    value = os.environ.get(var_name, "").strip()
+    if var_name not in os.environ or not os.environ[var_name].strip():
+        os.environ[var_name] = input(f"Enter your {var_name}: ").strip()
+    value = os.environ.get(var_name).strip()
     if not value:
         raise RuntimeError(f"Environment variable {var_name} must be set before calling this function.")
     return value

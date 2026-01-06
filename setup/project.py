@@ -103,21 +103,23 @@ def _require_env(var_name: str) -> str:
     return value
 
 
-def store_credentials_from_env(username_var: str = "GITHUB_USERNAME", token_var: str = "GITHUB_TOKEN", netrc_path: Optional[Path] = None) -> Path:
+def store_credentials_from_env(machine: str = "github.com", username_var: str = "GITHUB_USERNAME", token_var: str = "GITHUB_TOKEN", netrc_path: Optional[Path] = None) -> Path:
     """Persist GitHub credentials from the environment into a ~/.netrc file."""
-
-    username = _require_env(username_var)
+    if username_var=='user':
+        username = 'user'
+    else:
+        username = _require_env(username_var)
     token = _require_env(token_var)
 
     target_path = Path(netrc_path) if netrc_path is not None else Path.home() / ".netrc"
     content = "".join(
         (
-            "machine github.com\n",
+            f"machine {machine}\n",
             f"login {username}\n",
             f"password {token}\n",
         )
     )
-    target_path.write_text(content)
+    target_path.write_text(content, append=True)
     target_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
     return target_path
 
